@@ -1,0 +1,246 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import sys
+import wx
+import json
+from MContacts import *
+from ATDialSpeechModem import *
+import ConfigParser
+from Log import *
+import os
+from MessageBoxs import *
+
+class MyFrame(wx.Frame):
+
+
+    
+    def __init__(self, *args, **kwds):
+        self.Log = Logs()
+        self.curdir = os.path.dirname(os.path.abspath(__file__))
+        kwds["style"] = wx.ICONIZE | wx.CAPTION  | wx.STAY_ON_TOP
+        wx.Frame.__init__(self, *args, **kwds)
+        #icon *********************************    
+        iconFile = self.curdir +"/my.ico"
+        icon1 = wx.Icon(iconFile, wx.BITMAP_TYPE_ICO)
+        self.SetIcon(icon1)
+        self.tbicon = wx.TaskBarIcon()
+        self.Bind(wx.EVT_ICONIZE, self.On_Iconify)
+        self.tbicon.Bind(wx.EVT_TASKBAR_LEFT_DCLICK, self.OnTaskBarActivate)
+        # ********************************* icon
+        # Tool Bar 
+        myReload = wx.NewId()
+        myHide = wx.NewId()
+        self.frame_1_toolbar = wx.ToolBar(self, -1, style=wx.TB_HORIZONTAL | wx.TB_3DBUTTONS | wx.TB_TEXT | wx.TB_NOICONS | wx.TB_HORZ_LAYOUT | wx.TB_HORZ_TEXT)
+        self.SetToolBar(self.frame_1_toolbar)
+        self.frame_1_toolbar.AddLabelTool(myReload, "Reload Google Conatcts", wx.NullBitmap, wx.NullBitmap, wx.ITEM_NORMAL, "Reload Google Conatcts", "")
+        self.frame_1_toolbar.AddLabelTool(myHide, "Hide", wx.NullBitmap, wx.NullBitmap, wx.ITEM_NORMAL, "Hidea", "")
+        self.Bind(wx.EVT_TOOL, self.On_Reload, id=myReload)
+        self.Bind(wx.EVT_TOOL, self.On_Hide, id=myHide)
+        # ********************************* Tool Bar end
+        #frame controls*********************************
+        self.label_Search = wx.StaticText(self, -1, "Search Contacts", style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE)
+        self.text_ctrl_searchname = wx.TextCtrl(self, -1, "")
+        self.text_ctrl_telephone = wx.TextCtrl(self, -1, "")
+        self.previuse_text_ctrl_searchname = ""
+        self.list_box_Contacts = wx.ListBox(self, -1, choices=[])
+        self.list_box_Telephones = wx.ListBox(self, -1, choices=[])
+        self.button_Dial = wx.Button(self, -1, "Dial")
+        self.button_HangUp = wx.Button(self, -1, "HangUp")
+        self.button_Close = wx.Button(self, -1, "Close")
+        self.Bind(wx.EVT_SHOW, self.On_Show)
+        self.Bind(wx.EVT_BUTTON, self.On_Click_Dial, self.button_Dial)
+        self.Bind(wx.EVT_BUTTON, self.On_Click_HangUp, self.button_HangUp)
+        self.Bind(wx.EVT_BUTTON, self.On_Click_Close, self.button_Close)
+        self.Bind(wx.EVT_LISTBOX, self.On_Click_Contact, self.list_box_Contacts)
+        self.Bind(wx.EVT_LISTBOX, self.On_Click_Phone, self.list_box_Telephones)
+        self.Bind(wx.EVT_TEXT, self.On_text_ctrl_searchname_entertext, self.text_ctrl_searchname)
+        self.Bind(wx.EVT_TEXT, self.On_text_ctrl_telephone, self.text_ctrl_telephone)
+        self.button_Dial.Disable()
+        self.button_HangUp.Disable()
+        #********************************* frame controls
+        #ReadConf file **************************************
+        self.Config = ConfigParser.ConfigParser()
+        self.Config.read(self.curdir  +"/GoogleContactsDialer.conf")
+        self.user = self.Config.get("GoogleLogin", 'UserName')
+        self.pw = self.Config.get("GoogleLogin", 'Password')
+        self.__Fill_list_box_Contacts()
+        #**************************************ReadConf file
+        self.__set_properties()
+        self.__do_layout()
+        
+    def __set_properties(self):
+        self.SetTitle("Google Contacts")
+        self.label_Search.SetMinSize((400, 20))
+        self.text_ctrl_searchname.SetMinSize((400, 27))
+        self.list_box_Contacts.SetMinSize((400, 200))
+        self.list_box_Telephones.SetMinSize((300, 63))
+        self.text_ctrl_telephone.SetMinSize((300, 27))
+        self.button_Dial.SetMinSize((100, 30))
+        self.button_HangUp.SetMinSize((100, 30))
+        self.button_Close.SetMinSize((100, 40))
+        self.frame_1_toolbar.SetToolBitmapSize((50, 50))
+        self.frame_1_toolbar.SetMargins((0, 0))
+        self.frame_1_toolbar.SetToolPacking(1)
+        self.frame_1_toolbar.SetToolSeparation(5)
+        self.frame_1_toolbar.Realize()
+
+    def __do_layout(self):
+        sizer_1 = wx.BoxSizer(wx.VERTICAL)
+        sizer_1_2 = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_1_2_2 = wx.BoxSizer(wx.VERTICAL)
+        sizer_1_2_1 = wx.BoxSizer(wx.VERTICAL)
+        sizer_1.Add(self.label_Search, 0, 0, 0)
+        sizer_1.Add(self.text_ctrl_searchname, 0, 0, 0)
+        sizer_1.Add(self.list_box_Contacts, 0, 0, 0)
+        sizer_1_2.Add(sizer_1_2_1, 0, wx.EXPAND, 0)
+        sizer_1_2.Add(sizer_1_2_2, 1, wx.EXPAND, 0)
+        sizer_1_2_1.Add(self.list_box_Telephones, 0, 0, 0)
+        sizer_1_2_1.Add(self.text_ctrl_telephone, 0, 0, 0)
+        sizer_1_2_2.Add(self.button_Dial, 0, wx.ALIGN_TOP | wx.ALIGN_LEFT, 0)
+        sizer_1_2_2.Add(self.button_HangUp, 0, wx.ALIGN_BOTTOM | wx.ALIGN_LEFT, 0)
+        sizer_1.Add(sizer_1_2, 1, wx.EXPAND, 0)
+        sizer_1.Add(self.button_Close, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.ALIGN_CENTER_VERTICAL, 0)
+        self.SetSizer(sizer_1)
+        sizer_1.Fit(self)
+        self.Layout()
+        self.Centre()
+        # end wxGlade
+        
+    def __Fill_list_box_Contacts(self):
+        self.button_Dial.Disable()
+        with open(self.curdir + "/Contacts.txt") as f:
+            simplejson = json
+            self.Contacts = simplejson.load(f)
+            self.Contacts_tmp = self.Contacts
+            self.Refresh_List_box_Contacts()
+        
+    def Refresh_List_box_Contacts(self):
+        self.list_box_Contacts.Clear()
+        tmp_list = []
+        for contact in self.Contacts_tmp:
+            try:
+               tmp_list.append(contact[0])
+            except  Exception as  ex:
+               self.Log.writelog("Refresh_List_box_Contacts  %s" % str(ex))
+        self.list_box_Contacts.Set(tmp_list)
+
+#EVENTS ********************************************************************************************************
+    def On_Show(self,event):
+        if self.IsShown():
+            self.MyMessageBox=MessageBoxs("Please Wait For Initialize Modem",'Initialize')
+            self.MyMessageBox.No_Button_Message_Box()
+            self._ATModem = ATDialSpeechModem(self.Config.get("Modem", 'SerialPort'), self.Config.get("Modem", 'Baudrate'),self.Config.get("Modem", 'InitializeAT'),self.Config.get("Modem", 'CallerIDAT'))
+            self.MyMessageBox.Close_No_Button_Message_Box()
+        
+    def On_Click_Dial(self, event):  # wxGlade: MyFrame.<event_handler>
+       phone = self.text_ctrl_telephone.Value.encode("utf8")
+       if len(phone) > 0: 
+            self._ATModem.Dial(phone)
+            self.button_HangUp.Enable()
+            self.button_Dial.Disable()
+            
+  
+        
+    def On_Click_HangUp(self, event):  # wxGlade: MyFrame.<event_handler>
+       self._ATModem.HangUp()
+       self.button_HangUp.Disable()
+       self.button_Dial.Enable()
+
+    def On_Click_Close(self, event):  # wxGlade: MyFrame.<event_handler>
+        self.Close()
+        self.Destroy()
+        
+    def On_Click_Contact(self, event):
+        self.button_Dial.Disable()
+        self.list_box_Telephones.Clear()
+        contactname = self.list_box_Contacts.GetStringSelection().encode("utf8")
+        for contact in self.Contacts_tmp:
+                try:
+                    contact_name = contact[0].encode('utf8')
+                    if str(contactname) == contact_name:
+                        for x in xrange(1, len(contact)):
+                            self.list_box_Telephones.Append(str(contact[x]))
+                except  Exception as  ex:
+                     self.Log.writelog("Click_Contact %s" % str(ex))
+    
+    def On_Click_Phone(self, event):
+        self.text_ctrl_telephone.Value=self.list_box_Telephones.GetStringSelection().encode("utf8")
+       
+    
+    def On_text_ctrl_telephone(self, event):
+        phone=self.text_ctrl_telephone.Value
+        if len(phone)>0:
+            if phone.isdigit():
+                self.button_Dial.Enable()
+            else:
+                self.button_Dial.Disable()
+        else:
+            self.button_Dial.Disable()
+         
+    def On_Reload(self, event):
+        try:
+            _MContacts = MContacts(self.user, self.pw)
+            if _MContacts.SaveContacts():
+                with open(self.curdir + "/Contacts.txt") as f:
+                    simplejson = json
+                    self.Contacts = simplejson.load(f)
+                    self.Contacts_tmp = self.Contacts
+                    self.Refresh_List_box_Contacts()
+                    self.Log.writelog("reload")
+        except  Exception as  ex:
+             self.Log.writelog("__Fill_list_box_Contacts %s" % str(ex))
+
+    def On_Iconify(self, event):
+        self.Show()
+
+    def On_Hide(self, event):
+        self.Log.writelog("hide")
+        self.Hide()
+
+    def OnTaskBarActivate(self, evt):
+        print 'OnTaskBarActivate...'
+        if self.IsIconized():
+            self.Iconize(False)
+            self.Show()
+            self.Raise()
+            self.tbicon.RemoveIcon()
+
+    def OnIconify(self, evt):
+        self.Log.writelog('OnIconify...')
+        if evt.Iconized():
+            self.Iconize(True)
+            self.Hide()
+            self.tbicon.SetIcon(self.icon)
+
+
+    def On_text_ctrl_searchname_entertext(self, event):
+
+        if self.text_ctrl_searchname.Value == "":
+            self.Contacts_tmp = self.Contacts
+        else:
+            if len(self.previuse_text_ctrl_searchname) < len(self.text_ctrl_searchname.Value):
+                self.Contacts_tmp = [row for row in self.Contacts_tmp if  self.text_ctrl_searchname.Value in row[0]]
+            else:
+                self.Contacts_tmp = [row for row in self.Contacts if  self.text_ctrl_searchname.Value in row[0]]
+        self.previuse_text_ctrl_searchname = self.text_ctrl_searchname.Value
+        self.Refresh_List_box_Contacts()
+# ******************************************************************************************************** EVENTS
+   
+
+
+
+class GoogleContacts(wx.App):
+
+    def OnInit(self):
+        wx.InitAllImageHandlers()
+        frame_1 = MyFrame(None, -1, "")
+        self.SetTopWindow(frame_1)
+        self.MyMessageBox=MessageBoxs("Please Wait For Initialize Modem",'Initialize')
+        self.MyMessageBox.No_Button_Message_Box()
+        frame_1.Show()
+        self.MyMessageBox.Close_No_Button_Message_Box()
+        return 1
+
+# end of class GoogleContacts
+ 
