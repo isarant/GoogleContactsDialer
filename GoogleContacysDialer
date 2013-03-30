@@ -1,0 +1,11 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*
+
+import sys
+from ContactsForm import *
+__author__ = "giannis"
+__date__ = "$Mar 30, 2013 12:25:40 AM$"
+    
+if __name__ == "__main__":
+    GoogleContacts_App = GoogleContacts(0)
+    GoogleContacts_App.MainLoop()
